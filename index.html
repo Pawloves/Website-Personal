@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naruto Flappy Bird Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #000; /* Untuk kontras dengan elemen game */
+        }
+
+        canvas {
+            display: block;
+            background: #000; /* Untuk kontras dengan elemen game */
+        }
+
+        .game-over, .start-game {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 5vw; /* Responsif terhadap ukuran layar */
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4vw;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        .game-over button, .start-game button {
+            padding: 2vw 4vw;
+            font-size: 4vw;
+            cursor: pointer;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .jump-button {
+            position: absolute;
+            bottom: 5vw;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 2vw 4vw;
+            font-size: 4vw;
+            cursor: pointer;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 15px;
+        }
+
+        .jump-count {
+            position: absolute;
+            top: 5vw;
+            right: 5vw;
+            font-size: 4vw;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2vw;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="start-game">
+        <p>Tekan Tombol Untuk Memulai Permainan</p>
+        <button onclick="startGame()">Mulai</button>
+    </div>
+    <div class="game-over">
+        <p>Game Over</p>
+        <button onclick="resetGame()">Hidup Kembali</button>
+    </div>
+    <button class="jump-button" onclick="jump()">Lompat</button>
+    <div class="jump-count">Jumlah Lompat: 0</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.9; // Menyesuaikan dengan ukuran layar
+            canvas.height = window.innerHeight * 0.7;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Set initial size
+
+        const narutoImage = new Image();
+        narutoImage.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQICZtnWg8fJ5o8a64B6vtTEjRjqAhqLggXcyiSmuPlahINkGeeG-1kmwA&s=10';
+
+        const shurikenImage = new Image();
+        shurikenImage.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcScZGcweosfz6HatO-CA3YrcVJXzbh9TrUOrjsmNLa2RhbQ-Ip2V85AwLo&s=10';
+
+        const backgroundImage = new Image();
+        backgroundImage.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTRi4qAuG0GNCDthWW58NydKNp27dXnnfmhP1kIwT2dt6bwHsloyXNRDNMx&s=10';
+
+        const gravity = 0.3; // Kurangi gravitasi untuk memperlambat kecepatan jatuh
+        const jumpPower = -7;
+        let narutoY = canvas.height / 2;
+        let narutoVelocity = 0;
+        let shurikenX = canvas.width;
+        let shurikenGap = 150;
+        let shurikenWidth = 50;
+        let shurikenHeight = 200;
+        let score = 0;
+        let gameOver = false;
+        let gameStarted = false;
+        let jumpCount = 0; // Menghitung jumlah lompatan
+
+        function drawNaruto() {
+            ctx.drawImage(narutoImage, 50, narutoY, 50, 50);
+        }
+
+        function drawShuriken() {
+            ctx.drawImage(shurikenImage, shurikenX, 0, shurikenWidth, shurikenHeight);
+            ctx.drawImage(shurikenImage, shurikenX, shurikenHeight + shurikenGap, shurikenWidth, canvas.height);
+        }
+
+        function updateShuriken() {
+            shurikenX -= 3;
+            if (shurikenX + shurikenWidth < 0) {
+                shurikenX = canvas.width;
+                shurikenHeight = Math.floor(Math.random() * (canvas.height - shurikenGap));
+                score++;
+            }
+        }
+
+        function checkCollision() {
+            if (narutoY < 0) {
+                // Batasi narutoY agar tidak lebih kecil dari 0 (batas atas)
+                narutoY = 0;
+                narutoVelocity = 0; // Hentikan gerakan vertikal jika menabrak batas atas
+            } else if (narutoY + 50 > canvas.height) {
+                // Batasi narutoY agar tidak lebih besar dari tinggi canvas - tinggi karakter (batas bawah)
+                narutoY = canvas.height - 50;
+                narutoVelocity = 0; // Hentikan gerakan vertikal jika menabrak batas bawah
+            }
+
+            if (shurikenX <= 100 && shurikenX + shurikenWidth >= 50 && 
+                (narutoY <= shurikenHeight || narutoY + 50 >= shurikenHeight + shurikenGap)) {
+                gameOver = true;
+                document.querySelector('.game-over').style.display = 'block';
+            }
+        }
+
+        function drawScore() {
+            ctx.font = "25px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText("Score: " + score, 10, 35);
+        }
+
+        function update() {
+            if (gameOver) {
+                return;
+            }
+
+            narutoVelocity += gravity;
+            narutoY += narutoVelocity;
+
+            // Batasi gerakan karakter di dalam area permainan
+            if (narutoY < 0) {
+                narutoY = 0;
+                narutoVelocity = 0;
+            } else if (narutoY + 50 > canvas.height) {
+                narutoY = canvas.height - 50;
+                narutoVelocity = 0;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height); // Latar belakang baru
+            drawNaruto();
+            drawShuriken();
+            drawScore();
+            updateShuriken();
+            checkCollision();
+
+            requestAnimationFrame(update);
+        }
+
+        function startGame() {
+            gameStarted = true;
+            document.querySelector('.start-game').style.display = 'none';
+            narutoVelocity = 0;
+            narutoY = canvas.height / 2;
+            shurikenX = canvas.width;
+            gameOver = false;
+            score = 0;
+            jumpCount = 0; // Reset jumlah lompatan
+            document.querySelector('.jump-count').textContent = "Jumlah Lompat: " + jumpCount; // Tampilkan ulang jumlah lompatan
+            update();
+        }
+
+        function resetGame() {
+            document.querySelector('.game-over').style.display = 'none';
+            narutoY = canvas.height / 2;
+            narutoVelocity = 0;
+            shurikenX = canvas.width;
+            score = 0;
+            gameOver = false;
+            jumpCount = 0; // Reset jumlah lompatan
+            document.querySelector('.jump-count').textContent = "Jumlah Lompat: " + jumpCount; // Tampilkan ulang jumlah lompatan
+            update();
+        }
+
+        function jump() {
+            if (!gameOver && gameStarted) {
+                narutoVelocity = jumpPower;
+                jumpCount++; // Tambah jumlah lompatan
+                document.querySelector('.jump-count').textContent = "Jumlah Lompat: " + jumpCount; // Tampilkan jumlah lompatan
+            }
+        }
+
+        // Menampilkan layar mulai game ketika halaman dimuat
+        window.onload = function() {
+            document.querySelector('.start-game').style.display = 'block';
+            ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height); // Latar belakang baru
+        };
+    </script>
+</body>
+</html>
+``
